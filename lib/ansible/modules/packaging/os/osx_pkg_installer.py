@@ -141,6 +141,7 @@ message:
 import os
 import re
 import datetime
+import shutil
 from ansible.module_utils.basic import AnsibleModule
 
 
@@ -157,6 +158,8 @@ def run_command(module, verbose_result, command_list, check_rc=True):
     if 'commands' not in verbose_result:
         verbose_result['commands'] = dict()
     verbose_result['commands'][gen_timestamp()] = dict(
+        command_list=command_list,
+        check_rc=check_rc,
         rc=rc,
         stdout=out,
         stderr=err,
@@ -182,7 +185,8 @@ def parse_pkg_info(std_out):
         version=parse_out('version', std_out),
         volume=volume,
         location=location,
-        root_dir=os.path.join(volume, location),
+        # join cannot merge absolute dirs join('/foo','/')=='/'
+        root_dir=os.path.realpath(volume + '/' + location),
         install_timestamp=install_timestamp,
         install_datetime=datetime.datetime.fromtimestamp(install_timestamp),
     )
@@ -227,6 +231,12 @@ def package_files(module, result, verbose_result, package_id, volume):
     result['pkg_files'] = parse_package_files(info['root_dir'], out)
     return result['pkg_files']
 
+def forget_package(module, result, verbose_result, package_id, volume):
+
+    command_list = ['/usr/sbin/pkgutil', '--forget', package_id, '--volume', volume]
+    rc, out, err = run_command(module, verbose_result, command_list)
+    result['forget'] = rc, out, err
+    return result['forget']
 
 def is_present(module, result, verbose_result, creates, package_id, volume):
     if package_id is not None:
@@ -249,8 +259,19 @@ def install(module, result, verbose_result, pkg_path, target):
     )
 
 
-def uninstall(module, result, verbose_result, creates, package_id):
-    raise PkgException("Not implemented")
+def uninstall(module, result, verbose_result, package_id, volume):
+    files = package_files(module, result, verbose_result, package_id, volume)
+    verbose_result['files'] = files
+    verbose_result['removal'] = []
+    for file_path in files:
+        if os.path.isdir(file_path):
+            verbose_result['removal'].append("Removing directory: %s" % file_path)
+            shutil.rmtree(file_path)
+        elif os.path.isfile(file_path):
+            verbose_result['removal'].append("Removing file: %s" % file_path)
+            os.remove(file_path)
+    forget_package(module, result, verbose_result, package_id, volume)
+    # raise PkgException("Not implemented")
 
 
 def list_all_packages(module, result, verbose_result, volume):
@@ -330,6 +351,7 @@ def run_module():
 
     verbose_result['creates'] = creates
     verbose_result['target'] = target
+    verbose_result['volume'] = volume
 
     try:
         if state == 'present':
@@ -347,20 +369,26 @@ def run_module():
         verbose_result['originally_present'] = originally_present
 
         result['changed'] = originally_present != should_be_present
+        # module.fail_json(msg=str("Debug"), **module.params)
+
         if module.check_mode:
             messages.append('Checking for %s for pkg at %s' % (app_name, pkg_path))
         else:
             messages.append('Running for %s for pkg at %s' % (app_name, pkg_path))
             if should_be_present:
+
                 if not originally_present:
                     install(module, result, verbose_result, pkg_path, target)
             else:
+
                 if originally_present:
                     files = package_files(module, result, verbose_result, package_id, volume)
                     verbose_result['files'] = files
                     if confident_to_remove:
-                        uninstall(module, result, verbose_result, pkg_path, target)
+                        uninstall(module, result, verbose_result, package_id, volume)
+
                     else:
+                        result['files'] = files
                         raise PkgException('Not confident_to_remove this package',
                                            'Review the files and become confident to continue')
 
@@ -369,7 +397,8 @@ def run_module():
         if module._verbosity > 0:
             result.update(verbose_result)
         module.exit_json(**result)
-    except PkgException as e:
+    # except PkgException as e:
+    except Exception as e:
         result['error'] = e.args
         if module._verbosity > 0:
             result.update(verbose_result)
