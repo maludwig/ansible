@@ -211,7 +211,10 @@ def pkg_info(module, result, verbose_result, package_id, volume):
 def parse_package_files(root_dir, std_out):
     files = []
     for path_tail in std_out.split('\n'):
-        if not path_tail == '':
+        # Protect poor end users from accidentally deleting their
+        # /, /Applications, and
+        # ~, ~/Applications directories
+        if path_tail != '' and path_tail != 'Applications':
             files.append(os.path.join(root_dir, path_tail))
     return files
 
@@ -329,6 +332,13 @@ def run_module():
     verbose_result['target'] = target
 
     try:
+        if state == 'present':
+            if pkg_path is None:
+                raise PkgException("Missing pkg_path when state is present")
+
+        if state == 'absent':
+            if package_id is None:
+                raise PkgException("Missing package_id when state is absent")
 
         original_package_list = list_all_packages(module, result, verbose_result, volume)
         verbose_result['original_package_list'] = original_package_list

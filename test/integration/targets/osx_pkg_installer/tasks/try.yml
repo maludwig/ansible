@@ -1,0 +1,129 @@
+# test code for the osx_pkg_installer module
+# (c) 2014, Michael DeHaan <michael.dehaan@gmail.com>
+
+# This file is part of Ansible
+#
+# Ansible is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Ansible is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
+
+- name: Record if we are root
+  shell: whoami
+  register: whoami_results
+
+- name: Ensure that the test package is not already installed on the local user
+  osx_pkg_installer:
+    state: absent
+    package_id: com.ansible.PkgTest
+    app_name: TestPackage
+
+
+- name: Remoooooove the test package that is already not installed
+  register: pkg_absent
+  osx_pkg_installer:
+    state: absent
+    package_id: com.ansible.PkgTest
+    app_name: TestPackage
+
+- name: Ensure that removing the test package again is not a change
+  assert:
+    that:
+       - "not pkg_absent.changed"
+
+- name: Install the package
+  register: pkg_install
+  osx_pkg_installer:
+    package_id: com.ansible.PkgTest
+    app_name: TestPackage
+    pkg_path: pkgtest.pkg
+
+
+- name: Ensure that installing the test package is a change
+  assert:
+    that:
+       - "pkg_install.changed"
+
+- name: Instaaaaaaalllll the package that is already installed
+  register: pkg_install_again
+  osx_pkg_installer:
+    app_name: TestPackage
+    pkg_path: pkgtest.pkg
+
+
+- name: Ensure that installing the test package again is not a change
+  assert:
+    that:
+       - "not pkg_install_again.changed"
+
+- name: Instaaaaaaalllll the package that is already installed with the wrong app_name but the right package_id
+  register: pkg_install_again_again
+  osx_pkg_installer:
+    package_id: com.ansible.PkgTest
+    app_name: Wrong App Name
+    pkg_path: pkgtest.pkg
+
+
+- name: Ensure that installing the test package again is not a change
+  assert:
+    that:
+       - "not pkg_install_again_again.changed"
+
+- name: Make sure that creates works for root
+  when: 'whoami.stdout == "root"'
+  register: root_creates
+  osx_pkg_installer:
+    creates: /Application/PkgTest
+    app_name: Wrong App Name
+    pkg_path: pkgtest.pkg
+
+- name: Ensure that installing the test package again is not a change
+  assert:
+    that:
+       - "not root_creates.changed"
+
+
+- name: Make sure that creates works for unprivileged user
+  when: 'whoami.stdout != "root"'
+  register: mortal_creates
+  osx_pkg_installer:
+    creates: "{{ ansible_env.HOME }}/Application/PkgTest"
+    app_name: Wrong App Name
+    pkg_path: pkgtest.pkg
+
+- name: Ensure that installing the test package again is not a change
+  assert:
+    that:
+       - "not mortal_creates.changed"
+
+
+- name: Remove the test package to be clean and tidy
+  register: tidy_up
+  osx_pkg_installer:
+    state: absent
+    app_name: TestPackage
+
+- name: Ensure that removing the test package is a change
+  assert:
+    that:
+       - "tidy_up.changed"
+
+
+- name: Remove the test package to be clean and tidy
+  register: tidy_up_again
+  osx_pkg_installer:
+    state: absent
+    app_name: TestPackage
+
+- name: Ensure that removing the test package is a change
+  assert:
+    that:
+       - "tidy_up.changed"

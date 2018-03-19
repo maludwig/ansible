@@ -1,0 +1,54 @@
+- name: test my new module
+  connection: local
+  hosts: localhost
+  tasks:
+#  - name: run the new module
+#    osx_pkg_installer:
+#      app_name: 1Password 6
+#      pkg_path: /Users/mitchell.ludwig/Downloads/1Password-6.8.7.pkg
+#    register: testout
+#  - name: dump test output
+#    debug:
+#      msg: '{{ testout }}'
+#
+#  - name: run the new module as root
+#    become: yes
+#    osx_pkg_installer:
+#      app_name: 1Password 6
+#      pkg_path: /Users/mitchell.ludwig/Downloads/1Password-6.8.7.pkg
+#    register: testrootout
+#  - name: dump test output
+#    debug:
+#      msg: '{{ testrootout }}'
+
+  - name: run the new module as root with change
+#    become: yes
+    osx_pkg_installer:
+      app_name: 1Password 6
+      package_id: com.agilebits.pkg.onepassword
+      pkg_path: /Users/mitchell.ludwig/Downloads/1Password-6.8.7.pkg
+    register: testrootout
+  - name: dump test output
+    debug:
+      msg: '{{ testrootout }}'
+
+#
+#  - name: run the new module as root with failure
+#    become: yes
+#    osx_pkg_installer:
+#      app_name: badthing
+#      pkg_path: /Users/mitchell.ludwig/Downloads/1Password-6.8.7.pkg
+#    register: testrootout
+#  - name: dump test output
+#    debug:
+#      msg: '{{ testrootout }}'
+#  - name: run the new module as root with failure
+#    become: yes
+#    osx_pkg_installer:
+#      app_name: badnewthing
+#      package_id: com.agilebits.pkg.onepassword
+#      pkg_path: /Users/mitchell.ludwig/Downloads/1Password-6.8.7.pkg
+#    register: testrootout
+#  - name: dump test output
+#    debug:
+#      msg: '{{ testrootout }}'
